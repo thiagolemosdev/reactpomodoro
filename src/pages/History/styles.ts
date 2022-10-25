@@ -82,15 +82,8 @@ export const Status = styled.span<StatusProps>`
     width: 0.5rem;
     height: 0.5rem;
     border-radius: 9999px;
+    // eslint-disable-next-line prettier/prettier
     background-color: ${(props) =>
     props.theme[STATUS_COLORS[props.statusColor]]};
   }
 `
-
-echo "#reactpomodoro" >> README.md
-git init
-git add.
-git commit - m "first commit"
-git branch - M main
-git remote add origin https://github.com/thiagolemosdev/reactpomodoro.git
-git push - u origin main
