@@ -84,6 +84,6 @@ export const Status = styled.span<StatusProps>`
     border-radius: 9999px;
     // eslint-disable-next-line prettier/prettier
     background-color: ${(props) =>
-    props.theme[STATUS_COLORS[props.statusColor]]};
+      props.theme[STATUS_COLORS[props.statusColor]]};
   }
 `
