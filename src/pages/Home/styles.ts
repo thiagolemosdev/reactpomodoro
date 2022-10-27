@@ -82,6 +82,7 @@ export const CountdownContainer = styled.div`
     background: ${(props) => props.theme['gray-700']};
     padding: 2rem 1rem;
     border-radius: 8px;
+    font-family: 'Roboto Mono', monospace;
   }
 `
 
