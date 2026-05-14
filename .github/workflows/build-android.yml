@@ -1,21 +1,14 @@
 name: Build Android APK
 
 on:
-  # Debug APK artifact on every push to main
   push:
-    branches: [main]
-    # Release APK on version tags — usage: git tag v1.0.0 && git push origin v1.0.0
+    branches:
+      - main
+      - 'claude/**'
     tags:
       - 'v*.*.*'
 
-  # Manual trigger from GitHub Actions UI
   workflow_dispatch:
-    inputs:
-      create_release:
-        description: 'Create a GitHub Release with the APK?'
-        required: false
-        default: 'false'
-        type: boolean
 
 jobs:
   build:
