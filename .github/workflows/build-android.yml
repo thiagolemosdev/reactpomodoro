@@ -8,8 +8,6 @@ on:
     tags:
       - 'v*.*.*'
 
-  # Manual trigger: Actions tab → Build Android APK → Run workflow
-  # Fill "version" (ex: v1.0.0) to also create a GitHub Release
   workflow_dispatch:
     inputs:
       version:
@@ -51,8 +49,18 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # ── 5. Android SDK (use pre-installed SDK on ubuntu-latest) ───────────────
-      - name: Accept Android SDK licenses & install SDK 35
+      # ── 5. Android SDK ────────────────────────────────────────────────────────
+      - name: Show pre-installed Android SDK info
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "--- Platforms ---"
+          ls "$ANDROID_HOME/platforms/" 2>/dev/null || echo "no platforms dir"
+          echo "--- Build-tools ---"
+          ls "$ANDROID_HOME/build-tools/" 2>/dev/null || echo "no build-tools dir"
+          echo "--- cmdline-tools ---"
+          ls "$ANDROID_HOME/cmdline-tools/" 2>/dev/null || echo "no cmdline-tools dir"
+
+      - name: Accept Android SDK licenses
         run: |
           mkdir -p "$ANDROID_HOME/licenses"
           printf '%s\n' \
@@ -61,13 +69,33 @@ jobs:
             'd56f5187479451eabf01fb78af6dfcb131a6481e' \
             '84831b9409646a918e30573bab4c9c91346d8abd' \
             > "$ANDROID_HOME/licenses/android-sdk-license"
-          # Install SDK platform and build-tools needed for compileSdk=35
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-            "platforms;android-35" \
-            "build-tools;35.0.0" \
-            --sdk_root="$ANDROID_HOME" 2>/dev/null || true
 
-      # ── 6. Copy web assets into android/ (replaces "cap sync") ───────────────
+      - name: Install SDK 35 if missing
+        run: |
+          SDKMANAGER=""
+          for p in \
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "$ANDROID_HOME/cmdline-tools/11.0/bin/sdkmanager" \
+            "$ANDROID_HOME/cmdline-tools/10.0/bin/sdkmanager" \
+            "$ANDROID_HOME/tools/bin/sdkmanager"; do
+            if [ -f "$p" ]; then SDKMANAGER="$p"; break; fi
+          done
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found — relying on pre-installed SDK"
+          else
+            echo "Using sdkmanager: $SDKMANAGER"
+            "$SDKMANAGER" --list_installed 2>&1 | head -30 || true
+            "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" --sdk_root="$ANDROID_HOME" || true
+          fi
+          # Verify platform-35 is present
+          if [ -d "$ANDROID_HOME/platforms/android-35" ]; then
+            echo "OK: android-35 platform present"
+          else
+            echo "ERROR: android-35 platform missing — trying sdkmanager again without --sdk_root"
+            "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0" 2>&1 || true
+          fi
+
+      # ── 6. Copy web assets into android/ ─────────────────────────────────────
       - name: Copy web assets to Android
         run: |
           mkdir -p android/app/src/main/assets/public
@@ -75,16 +103,28 @@ jobs:
           cp -r dist/. android/app/src/main/assets/public/
           cp capacitor.config.json android/app/src/main/assets/capacitor.config.json
 
+      - name: Create local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
       # ── 7. Build debug APK ────────────────────────────────────────────────────
       - name: Build debug APK
+        id: gradle
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee /tmp/gradle-build.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      # ── 8. Rename APK with version ────────────────────────────────────────────
+      # ── 8. Upload Gradle log (always — even on failure) ───────────────────────
+      - name: Upload Gradle log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-build-log
+          path: /tmp/gradle-build.log
+          retention-days: 7
+
+      # ── 9. Rename APK with version ────────────────────────────────────────────
       - name: Prepare APK
         id: apk
         run: |
@@ -102,7 +142,7 @@ jobs:
           echo "name=$DEST"    >> "$GITHUB_OUTPUT"
           echo "version=$VER"  >> "$GITHUB_OUTPUT"
 
-      # ── 9. Upload artifact (always) ───────────────────────────────────────────
+      # ── 10. Upload APK artifact ───────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -110,7 +150,7 @@ jobs:
           path: ${{ steps.apk.outputs.path }}
           retention-days: 30
 
-      # ── 10. GitHub Release (tag push OR manual with version filled) ───────────
+      # ── 11. GitHub Release ────────────────────────────────────────────────────
       - name: Create GitHub Release
         if: >-
           startsWith(github.ref, 'refs/tags/v') ||
@@ -120,7 +160,7 @@ jobs:
           tag_name: ${{ steps.apk.outputs.version }}
           name: CosmicFocus ${{ steps.apk.outputs.version }}
           body: |
-            ## 🌌 CosmicFocus ${{ steps.apk.outputs.version }}
+            ## CosmicFocus ${{ steps.apk.outputs.version }}
 
             ### Como instalar no Android
 
@@ -129,15 +169,6 @@ jobs:
             3. Abra o APK e instale
 
             > Requer Android 7.0 (API 24) ou superior.
-
-            ---
-
-            **Fase 1 inclui:**
-            - ⏱️ Timer Pomodoro com objetivos por categoria
-            - 🎯 Metas diárias com progress bars e agenda
-            - 🛡️ FocusGuard — sair do app cancela o Pomodoro
-            - 🌌 Universo — cada Pomodoro vira uma estrela
-            - 📜 Histórico completo
           files: ${{ steps.apk.outputs.path }}
           draft: false
           prerelease: false
