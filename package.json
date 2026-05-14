@@ -1,15 +1,21 @@
 {
-  "name": "02-ignite-timer",
+  "name": "cosmicfocus",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext .ts,.tsx"
+    "lint": "eslint src --ext .ts,.tsx",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npm run build && npx cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@hookform/resolvers": "^2.9.10",
     "date-fns": "^2.29.3",
     "phosphor-react": "^1.4.1",

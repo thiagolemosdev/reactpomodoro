@@ -1,6 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { differenceInSeconds } from 'date-fns'
 
+// Capacitor App plugin — only available when running as native Android/iOS
+let CapacitorApp: typeof import('@capacitor/app').App | null = null
+let isNative = false
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { App } = require('@capacitor/app')
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { Capacitor } = require('@capacitor/core')
+  if (Capacitor.isNativePlatform()) {
+    CapacitorApp = App
+    isNative = true
+  }
+} catch {
+  // running in browser — use visibilitychange instead
+}
+
 interface FocusGuardResult {
   isAway: boolean
   secondsAway: number
@@ -19,13 +36,37 @@ export function useFocusGuard(
   const awayStartRef = useRef<Date | null>(null)
   const onFailRef = useRef(onFail)
 
-  // keep ref in sync so the interval doesn't capture stale onFail
   useEffect(() => {
     onFailRef.current = onFail
   }, [onFail])
 
+  // Native Android: use Capacitor App state changes (more reliable than visibilitychange)
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !isNative || !CapacitorApp) return
+
+    let listenerHandle: { remove: () => void } | null = null
+
+    CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) {
+        awayStartRef.current = new Date()
+        setIsAway(true)
+      } else {
+        awayStartRef.current = null
+        setIsAway(false)
+        setSecondsAway(0)
+      }
+    }).then((handle) => {
+      listenerHandle = handle
+    })
+
+    return () => {
+      listenerHandle?.remove()
+    }
+  }, [enabled])
+
+  // Web: use Page Visibility API
+  useEffect(() => {
+    if (!enabled || isNative) return
 
     function handleVisibilityChange() {
       if (document.hidden) {
@@ -43,6 +84,7 @@ export function useFocusGuard(
       document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [enabled])
 
+  // Countdown when away — shared between native and web paths
   useEffect(() => {
     if (!enabled || !isAway) return
 
