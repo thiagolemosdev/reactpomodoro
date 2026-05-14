@@ -23,11 +23,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Source code ────────────────────────────────────────────────────────
+      # ── 1. Source ─────────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Node / JS deps ─────────────────────────────────────────────────────
+      # ── 2. Node / JS ──────────────────────────────────────────────────────────
       - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
@@ -37,37 +37,49 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      # ── 3. Build React app ────────────────────────────────────────────────────
+      # ── 3. React build ────────────────────────────────────────────────────────
       - name: Build web app
         run: npm run build
 
       - name: Verify dist/
-        run: ls -la dist/ dist/assets/
+        run: ls dist/ && ls dist/assets/
 
-      # ── 4. Java / Android SDK ─────────────────────────────────────────────────
+      # ── 4. Java ───────────────────────────────────────────────────────────────
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # ── 5. Android SDK (use pre-installed SDK on ubuntu-latest) ───────────────
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          printf '%s\n' \
+            '24333f8a63b6825ea9c5514f83c2829b004d1fee' \
+            '8933bad161af4178b1185d1a37fbf41ea5269c55' \
+            'd56f5187479451eabf01fb78af6dfcb131a6481e' \
+            '84831b9409646a918e30573bab4c9c91346d8abd' \
+            > "$ANDROID_HOME/licenses/android-sdk-license"
 
-      # ── 5. Capacitor: copy web assets into android/ ──────────────────────────
-      - name: Capacitor sync
-        run: npx cap sync android
-        env:
-          CI: true
+      # ── 6. Copy web assets into android/ (replaces "cap sync") ───────────────
+      - name: Copy web assets to Android
+        run: |
+          mkdir -p android/app/src/main/assets/public
+          rm -rf android/app/src/main/assets/public/*
+          cp -r dist/. android/app/src/main/assets/public/
+          cp capacitor.config.json android/app/src/main/assets/capacitor.config.json
 
-      # ── 6. Build debug APK ────────────────────────────────────────────────────
+      # ── 7. Build debug APK ────────────────────────────────────────────────────
       - name: Build debug APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
 
-      # ── 7. Rename APK with version ────────────────────────────────────────────
+      # ── 8. Rename APK with version ────────────────────────────────────────────
       - name: Prepare APK
         id: apk
         run: |
@@ -81,11 +93,11 @@ jobs:
           fi
           DEST="CosmicFocus-${VER}.apk"
           cp "$APK" "$DEST"
-          echo "path=$DEST" >> "$GITHUB_OUTPUT"
-          echo "name=$DEST"  >> "$GITHUB_OUTPUT"
-          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "path=$DEST"    >> "$GITHUB_OUTPUT"
+          echo "name=$DEST"    >> "$GITHUB_OUTPUT"
+          echo "version=$VER"  >> "$GITHUB_OUTPUT"
 
-      # ── 8. Upload artifact (always) ───────────────────────────────────────────
+      # ── 9. Upload artifact (always) ───────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -93,7 +105,7 @@ jobs:
           path: ${{ steps.apk.outputs.path }}
           retention-days: 30
 
-      # ── 9. GitHub Release (on tag OR manual with version filled) ─────────────
+      # ── 10. GitHub Release (tag push OR manual with version filled) ───────────
       - name: Create GitHub Release
         if: >-
           startsWith(github.ref, 'refs/tags/v') ||
@@ -109,7 +121,7 @@ jobs:
 
             1. Baixe **${{ steps.apk.outputs.name }}** abaixo
             2. No Android: **Configurações → Segurança → Fontes desconhecidas** → ative
-            3. Abra o APK baixado e clique em Instalar
+            3. Abra o APK e instale
 
             > Requer Android 7.0 (API 24) ou superior.
 
