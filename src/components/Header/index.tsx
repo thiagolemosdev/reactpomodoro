@@ -1,18 +1,38 @@
-import { HeaderContainer } from './styles'
-import logoIgnite from '../../assets/logo-ignite.svg'
-import { Timer, Scroll } from 'phosphor-react'
+import { HeaderContainer, Logo, NavIcon } from './styles'
+import { Timer, Target, Planet, Scroll } from 'phosphor-react'
 import { NavLink } from 'react-router-dom'
 
 export function Header() {
   return (
     <HeaderContainer>
-      <img src={logoIgnite} alt="" />
+      <Logo>
+        <Planet size={28} weight="fill" />
+        <span>CosmicFocus</span>
+      </Logo>
       <nav>
         <NavLink to="/" end title="Timer">
-          <Timer size={24} />
+          <NavIcon>
+            <Timer size={20} />
+            <span>Timer</span>
+          </NavIcon>
+        </NavLink>
+        <NavLink to="/goals" title="Metas">
+          <NavIcon>
+            <Target size={20} />
+            <span>Metas</span>
+          </NavIcon>
+        </NavLink>
+        <NavLink to="/universe" title="Universo">
+          <NavIcon>
+            <Planet size={20} />
+            <span>Universo</span>
+          </NavIcon>
         </NavLink>
         <NavLink to="/history" title="Histórico">
-          <Scroll size={24} />
+          <NavIcon>
+            <Scroll size={20} />
+            <span>Histórico</span>
+          </NavIcon>
         </NavLink>
       </nav>
     </HeaderContainer>
