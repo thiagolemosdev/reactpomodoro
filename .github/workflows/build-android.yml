@@ -108,12 +108,11 @@ jobs:
 
       # ── 7. Build debug APK ────────────────────────────────────────────────────
       - name: Build debug APK
-        id: gradle
         working-directory: android
         run: |
           chmod +x gradlew
+          set -o pipefail
           ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee /tmp/gradle-build.log
-          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       # ── 8. Upload Gradle log (always — even on failure) ───────────────────────
       - name: Upload Gradle log
